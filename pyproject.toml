@@ -1,7 +1,7 @@
 [project]
 name = "python-for-ai"
 version = "0.1.0"
-description = "Add your description here"
+description = "Python for GenAI engineering: Pydantic, async, LLM apps. Daily learning log."
 readme = "README.md"
 authors = [
     { name = "sijo varghese", email = "sijovarghese1604@gmail.com" }
