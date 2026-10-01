@@ -2,6 +2,7 @@ import ollama
 
 MODEL = "llama3.2"
 SYSTEM = "You are a friendly compliance assistant. Keep answers under 4 sentences."
+MAX_HISTORY = 7  # how many recent messages to send (besides the system prompt)
 
 history: list[dict] = [{"role": "system", "content": SYSTEM}]
 
@@ -11,12 +12,12 @@ while True:
         break
 
     history.append({"role": "user", "content": user_text})
-
+    to_send = [history[0], *history[1:][-MAX_HISTORY:]]
     response = ollama.chat(
         model=MODEL,
         # messages=history,                         # send the WHOLE history every time
         # messages=[history[0], history[-1]],       # only the system prompt + latest message
-        messages=[history[0],*history[1:][-6:]],    # only the system prompt + lats 6 messages
+        messages=to_send,                           # only the system prompt + last 6 messages
         options={"num_predict": 400, "temperature": 0.3},
     )
 
@@ -25,7 +26,7 @@ while True:
 
     print(f"\nAssistant: {reply}")
     print(f"[input={response.prompt_eval_count} output={response.eval_count} "
-          f"messages in history={len(history)}]")
+          f"stored={len(history)} sent={len(to_send)}]")
     if response.done_reason == "length":
         print("\nReply was cut off")
     if response.eval_duration and response.eval_count:
