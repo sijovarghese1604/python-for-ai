@@ -37,3 +37,5 @@ Roles	system = rules (developer), user = input, assistant = model's replies
 Temperature	Low = consistent (business logic), high = varied (creative)
 Cost	(input tokens × input price) + (output tokens × output price), priced per million tokens
 Streaming	Send the reply token by token so the UI shows progress immediately
+
+My own example: I asked a local Llama 3.2 model for research papers on employee trading pre-clearance. It produced three citations with real journal names, volumes and page numbers. None of them existed. Yet with a specific SEBI circular number, it correctly said it couldn't access it. Lesson: hallucination depends on how the question is worded, so you can't rely on the model to refuse. You need RAG, source verification and evals.
