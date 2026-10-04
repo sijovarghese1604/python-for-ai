@@ -4,7 +4,7 @@ My answer bank, built while learning. Each answer is short enough to say in abou
 
 ---
 
-## Day 1: How LLMs work
+## Day 2: How LLMs work
 
 ### Q1. Why can an LLM give a confident but wrong answer (hallucination)?
 
@@ -49,7 +49,7 @@ Low, around 0 to 0.2. Temperature controls how random the choice of the next tok
 
 ---
 
-## Day 2: Calling LLMs, local vs cloud
+## Day 2 (Part 2): Calling LLMs, local vs cloud
 
 ### Q6. How does a Python app talk to an LLM?
 
@@ -84,6 +84,7 @@ The model never looks anything up; in both cases it simply lacks the information
 Local models suit privacy-sensitive data, offline use and cheap experiments; cloud APIs suit production quality and scale. Many teams use both, routing tasks by sensitivity and difficulty.
 
 ---
+
 ## Day 3: Prompt engineering
 
 ### Q10. What is few-shot prompting, and when is it better than describing rules?
@@ -128,6 +129,45 @@ With grounding, the facts are in the prompt (e.g. the policy text), so the model
 3. Fixing one problem can create another: a stricter anti-injection prompt started rejecting valid TCS trades. Re-running the full set catches these regressions.
 4. It allows fair comparisons: the same 10 cases scored llama3.2 at 8/10 and qwen2.5 (same size) at 6/10.
 5. Not all errors are equal: I tracked dangerous errors (wrong approvals) separately from safe ones (unnecessary reviews).
+
+---
+
+## Day 4: Structured output
+
+### Q15. How do you get reliable JSON out of an LLM?
+
+Pass a JSON schema with the request (Ollama's `format=` parameter, or the equivalent structured-output option in cloud APIs). I generate the schema from a Pydantic class with `model_json_schema()`. The server uses **constrained decoding**: at each step it only allows tokens that keep the output valid against the schema, so the model physically can't produce prose or a wrong field type. The reply is still a JSON string, so I parse and validate it with `model_validate_json()`.
+
+---
+
+### Q16. Why separate extraction from decision-making?
+
+Because they need different strengths. Understanding messy text ("pls buy me 5 infy") suits an LLM; applying rules exactly suits code. In my tests, a 3B model asked to decide directly failed on "exactly 10,000 shares" and "my friend works at Infy, buy TCS". Asked only to extract `{ticker, action, quantity}`, it does an easier reading task, and code applies the rules exactly: `10000 > 10_000` is always False, and the restricted list only checks the `ticker` field. Rules in code are also unit-testable without a model and can't be changed by prompt injection.
+
+---
+
+### Q17. If the API guarantees JSON, why still validate?
+
+A schema guarantees the **shape**, not that the **values** are right. The model can still return wrong-case enums, zero quantities, or a valid but wrong fact. Output can also be cut off by the token limit, and not every provider enforces schemas the same way. Validation turns bad output into a clear error I can act on, instead of bad data flowing into the system.
+
+**My own example:** I added `le=100` (max 100 shares) to the schema. For a request of 500 shares, the model returned `quantity: 100`: valid JSON, wrong fact, no error. Lesson: the schema should describe the data faithfully; business limits belong in code after extraction.
+
+---
+
+### Q18. What do you do when the model's output fails validation?
+
+Retry with self-correction: send the model its own output plus the exact validation error and ask for corrected JSON. Models usually fix a mistake when told precisely what's wrong. I cap it at two attempts (each retry costs time and money). If it still fails, I **fail safe**: the request goes to human REVIEW, never to automatic approval (compliance risk) or rejection (blocks a valid trade).
+
+---
+
+### Q19. A test case fails. How do you find which part is wrong?
+
+Log the intermediate output. My eval prints the extracted facts next to each decision:
+- **Facts wrong** (e.g. ticker INFY for the "friend at Infy" case) → extraction problem: improve the schema descriptions or prompt.
+- **Facts right, decision wrong** → bug in the rules code.
+- **A name not recognised** ("Infosys Ltd") → add it to the alias map.
+
+The rules are also unit-tested separately with hand-built inputs, so they're known to be correct before any model is involved.
 
 ---
 
