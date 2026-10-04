@@ -144,6 +144,8 @@ Pass a JSON schema with the request (Ollama's `format=` parameter, or the equiva
 
 Because they need different strengths. Understanding messy text ("pls buy me 5 infy") suits an LLM; applying rules exactly suits code. In my tests, a 3B model asked to decide directly failed on "exactly 10,000 shares" and "my friend works at Infy, buy TCS". Asked only to extract `{ticker, action, quantity}`, it does an easier reading task, and code applies the rules exactly: `10000 > 10_000` is always False, and the restricted list only checks the `ticker` field. Rules in code are also unit-testable without a model and can't be changed by prompt injection.
 
+**My result:** on the same 10-case test set with the same model (llama3.2 3B), letting the LLM decide scored 8/10; LLM extraction + rules in code scored 10/10, fixing both hard cases and still blocking the injection attempt.
+
 ---
 
 ### Q17. If the API guarantees JSON, why still validate?
