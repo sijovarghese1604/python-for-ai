@@ -1,5 +1,8 @@
+from typing import Literal
+
 from extractor import TradeExtraction
 
+Decision =  Literal["APPROVED","REJECTED", "REVIEW"]
 RESTRICTED = {"INFY", "HDFCBANK"}
 REVIEW_ABOVE = 10_000
 
@@ -17,7 +20,7 @@ def normalize(ticker: str) -> str:
     return ALIASES.get(t, t)
 
 
-def decide(trade: TradeExtraction | None) -> str:
+def decide(trade: TradeExtraction | None) -> Decision:
     if trade is None:                      # extraction failed twice -> a human looks at it
         return "REVIEW"
     if normalize(trade.ticker) in RESTRICTED:
