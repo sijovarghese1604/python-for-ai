@@ -173,6 +173,53 @@ The rules are also unit-tested separately with hand-built inputs, so they're kno
 
 ---
 
+## Day 5: FastAPI
+
+### Q20. How does FastAPI decide where a parameter comes from?
+
+From the type hints and the path:
+- Name appears in the path (`/greet/{name}`) → **path parameter**.
+- Simple type (`str`, `int`, `bool`) not in the path → **query parameter** (`?excited=true`); a default value makes it optional.
+- Type is a **Pydantic model** → **JSON request body**, validated automatically.
+
+Invalid input never reaches my function: FastAPI returns 422 with the exact field and reason. The same type hints also generate the OpenAPI docs at `/docs`.
+
+---
+
+### Q21. Why limit input size in an AI API?
+
+Every token the LLM reads costs time, and with a paid API, money. Without a limit, one user could send a huge document and run up cost or slow the service for everyone (a denial-of-service risk). Long inputs can also exceed the model's context window and give attackers more room for prompt injection. So I validate size at the API boundary (`max_length=1000`) before any LLM call; a rejected request costs nothing.
+
+---
+
+### Q22. How do you choose status codes for an LLM endpoint?
+
+By whether the API did its job:
+- **200 + REVIEW**: extraction failed, but the API worked as designed and safely routed the request to a human.
+- **422**: the client sent invalid input; fix the request.
+- **503**: a dependency (the LLM server) is down; the API couldn't do its job, retry later.
+- **500**: an unexpected bug; I only catch errors I understand, so unknown problems stay visible.
+
+Clear codes let the frontend respond correctly: fix-the-form for 422, retry for 503.
+
+---
+
+### Q23. `def` or `async def` for an endpoint that calls an LLM?
+
+It depends on the client library. An `async def` endpoint runs on a single event loop, which can only serve other requests while my code is at an `await`. A blocking call like `ollama.chat()` inside `async def` freezes the whole server. In my test, `/health` waited 4.5 s behind another user's 5-second request. With plain `def`, FastAPI runs the endpoint in a thread pool, so blocking calls are safe. Best for high traffic: an async client (`ollama.AsyncClient`) with `async def` and `await`.
+
+---
+
+### Q24. How do you test an API that depends on an LLM?
+
+Two layers:
+1. **API tests** with a fake LLM: pytest + FastAPI's `TestClient`, with `monkeypatch` replacing the extractor. They check routing, validation, rules and status codes (including LLM-down → 503), and they're fast, free and deterministic. My 12 tests run in under a second.
+2. **Evals** with the real model: a labelled test set run through the full pipeline to measure accuracy (my `pipeline_eval.py`, 10/10).
+
+Tests guarantee my code's behaviour; evals measure the model's quality. You need both.
+
+---
+
 ## Key facts to remember
 
 | Concept | One-line summary |

@@ -22,11 +22,38 @@ Messy request ──▶ LLM extracts JSON ──▶ Pydantic validates ──▶
 The model does what it's good at (reading messy language); code does what it's good at (applying rules exactly,
 unit-testable, immune to prompt injection).
 
+## Pre-clearance API
+
+The pipeline runs behind a FastAPI service:
+
+```http
+POST /pre-clearance
+{"employee_id": "E102", "text": "my friend at Infy suggested TCS, please buy 100 shares of TCS"}
+```
+
+```json
+{
+  "employee_id": "E102",
+  "decision": "APPROVED",
+  "facts": {"ticker": "TCS", "action": "buy", "quantity": 100, "blackout_period": false}
+}
+```
+
+| Status | When |
+| --- | --- |
+| 200 | Decision made, including REVIEW when extraction fails (safely routed to a human) |
+| 422 | Invalid input: missing field, text under 5 or over 1,000 characters |
+| 503 | The LLM server is unavailable |
+
+The response returns the extracted facts alongside the decision, so a UI can show *why* a request was decided.
+
 ## Tech stack
 
 - **Python 3.12**, managed with **uv**
-- **Pydantic v2**: validation of user input and LLM output
+- **FastAPI** + Uvicorn: REST API with automatic OpenAPI docs
+- **Pydantic v2**: validation of API input and LLM output
 - **Ollama** running **Llama 3.2 (3B)** locally; also compared with Qwen 2.5 (3B)
+- **pytest** + FastAPI `TestClient`: API tests with a mocked LLM
 - **asyncio**, **httpx**
 - Type checking with Pylance / mypy
 
@@ -39,11 +66,17 @@ ollama pull llama3.2
 # 2. Install dependencies
 uv sync
 
-# 3. Run the pre-clearance pipeline against the test set
+# 3. Evaluate the pipeline against the labelled test set (real model)
 uv run pipeline_eval.py
+
+# 4. Start the API, then open http://127.0.0.1:8000/docs
+uv run fastapi dev main.py
+
+# 5. Run the API tests (no Ollama needed: the LLM is mocked)
+uv run pytest -v
 ```
 
-Every file runs on its own with `uv run <file>.py`. Ollama must be running for files that call the model.
+Every learning file runs on its own with `uv run <file>.py`. Ollama must be running for files that call the model.
 
 ## What's inside, day by day
 
@@ -82,6 +115,15 @@ Every file runs on its own with `uv run <file>.py`. Ollama must be running for f
 | `rules.py` | Compliance rules in plain Python: restricted list, blackout, review threshold, ticker aliases |
 | `pipeline_eval.py` | End-to-end evaluation that prints the extracted facts, so each failure points to the right layer |
 
+### Day 5: FastAPI service
+
+| File | What it shows |
+| --- | --- |
+| `hello_api.py` | FastAPI basics: path and query parameters, automatic validation, `/docs` |
+| `main.py` | `POST /pre-clearance` and `/health`: request/response models, input size limits, 503 when the LLM is down |
+| `test_api.py` | 10 API tests with a mocked extractor (`monkeypatch`), including a parametrized boundary test for the 10,000-share review threshold |
+| `blocking_demo.py` | Why a blocking LLM call must not sit inside `async def`: measured `/health` waiting 4.5 s behind a blocking endpoint vs 0.0 s with `def` or `await` |
+
 ## Findings from my own experiments
 
 - **Hallucination depends on wording.** Asked about a made-up SEBI circular number, the model refused. Asked for
@@ -99,17 +141,22 @@ Every file runs on its own with `uv run <file>.py`. Ollama must be running for f
 - **Business limits don't belong in the extraction schema.** With a 100-share cap in the schema, a 500-share
   request came back as `quantity: 100`: valid JSON, wrong fact, no error. The schema should describe the data
   faithfully; code enforces the limits.
+- **`async def` doesn't make code non-blocking.** With a blocking call inside `async def`, a health check waited
+  4.5 s behind another request. Plain `def` (thread pool) or an awaited async client fixed it (0.0 s).
+- **Tests and evals do different jobs.** API tests with a mocked LLM check my code (fast, free, deterministic);
+  the eval with the real model measures model quality.
 
 ## Interview notes
 
-[`interview-notes.md`](interview-notes.md) holds my answers to common GenAI interview questions (Q1–Q19), each
+[`interview-notes.md`](interview-notes.md) holds my answers to common GenAI interview questions (Q1–Q24), each
 backed by results from this repo: tokens and context windows, statelessness, temperature, cost control,
-local vs cloud models, hallucination, prompt injection, few-shot prompting, grounding, evals and structured output.
+local vs cloud models, hallucination, prompt injection, few-shot prompting, grounding, evals, structured output,
+API design for LLM services, async vs blocking calls, and testing with a mocked LLM.
 
 ## Roadmap
 
 - [x] Week 1: Python for AI, LLM fundamentals, prompt engineering, structured output
-- [ ] FastAPI service: `POST /pre-clearance` with automated API tests
+- [x] FastAPI service: `POST /pre-clearance` with automated API tests
 - [ ] Tool calling and the agent loop, with a streaming React / Next.js chat UI
 - [ ] RAG over compliance policy documents, with citations (pgvector)
 - [ ] Agents with LangGraph and MCP, including human-in-the-loop approval
