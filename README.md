@@ -22,6 +22,24 @@ Messy request ──▶ LLM extracts JSON ──▶ Pydantic validates ──▶
 The model does what it's good at (reading messy language); code does what it's good at (applying rules exactly,
 unit-testable, immune to prompt injection).
 
+## Project structure
+
+Each day of learning has its own folder, with everything that day needs inside it.
+
+```
+python-for-ai/
+├── README.md
+├── interview-notes.md        # GenAI interview Q&A, backed by my own experiments
+├── pyproject.toml            # dependencies (managed with uv)
+├── day01_python/             # Python for AI: types, Pydantic, async
+├── day02_llm_basics/         # tokens, cost, statelessness, local chat with Ollama
+├── day03_prompting/          # prompt techniques, injection tests, classifier eval
+├── day04_structured_output/  # LLM extraction + rules in code (10/10 on the test set)
+└── day05_fastapi/            # the pre-clearance API and its tests
+```
+
+`day05_fastapi/` has its own copies of `extractor.py` and `rules.py`, so the API folder runs on its own.
+
 ## Pre-clearance API
 
 The pipeline runs behind a FastAPI service:
@@ -67,20 +85,20 @@ ollama pull llama3.2
 uv sync
 
 # 3. Evaluate the pipeline against the labelled test set (real model)
-uv run pipeline_eval.py
+uv run day04_structured_output/pipeline_eval.py
 
 # 4. Start the API, then open http://127.0.0.1:8000/docs
-uv run fastapi dev main.py
+uv run fastapi dev day05_fastapi/main.py
 
 # 5. Run the API tests (no Ollama needed: the LLM is mocked)
 uv run pytest -v
 ```
 
-Every learning file runs on its own with `uv run <file>.py`. Ollama must be running for files that call the model.
+Every learning file runs on its own, e.g. `uv run day03_prompting/classifier.py`. Ollama must be running for files that call the model.
 
 ## What's inside, day by day
 
-### Day 1: Python for AI
+### Day 1: Python for AI (`day01_python/`)
 
 | File | What it shows |
 | --- | --- |
@@ -90,7 +108,7 @@ Every learning file runs on its own with `uv run <file>.py`. Ollama must be runn
 | `async_demo.py` | `async`/`await`, `asyncio.gather`, HTTP calls with httpx |
 | `exercise.py` | Async pre-clearance checker: validates 5 requests and checks them in parallel (~0.5 s, not 2.5 s) |
 
-### Day 2: How LLMs work, and calling one from Python
+### Day 2: How LLMs work, and calling one from Python (`day02_llm_basics/`)
 
 | File | What it shows |
 | --- | --- |
@@ -98,7 +116,7 @@ Every learning file runs on its own with `uv run <file>.py`. Ollama must be runn
 | `local_first_call.py` | First call to a local model: tokens, `done_reason`, tokens/second |
 | `local_chat.py` | Multi-turn chat with a limited history window, cut-off detection and speed stats |
 
-### Day 3: Prompt engineering and first evals
+### Day 3: Prompt engineering and first evals (`day03_prompting/`)
 
 | File | What it shows |
 | --- | --- |
@@ -106,7 +124,7 @@ Every learning file runs on its own with `uv run <file>.py`. Ollama must be runn
 | `t1_specific.py` … `t5_dont_know.py` | Five techniques: specificity, system prompts, tags against prompt injection, few-shot, grounding |
 | `classifier.py` | Pre-clearance classifier scored on a 10-case test set, including tricky and adversarial cases |
 
-### Day 4: Structured output
+### Day 4: Structured output (`day04_structured_output/`)
 
 | File | What it shows |
 | --- | --- |
@@ -115,7 +133,7 @@ Every learning file runs on its own with `uv run <file>.py`. Ollama must be runn
 | `rules.py` | Compliance rules in plain Python: restricted list, blackout, review threshold, ticker aliases |
 | `pipeline_eval.py` | End-to-end evaluation that prints the extracted facts, so each failure points to the right layer |
 
-### Day 5: FastAPI service
+### Day 5: FastAPI service (`day05_fastapi/`)
 
 | File | What it shows |
 | --- | --- |
